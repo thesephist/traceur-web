@@ -12,30 +12,30 @@ const rand = (min, max) => min + Math.random() * (max - min)
 const degToRad = deg => deg * Math.PI / 180;
 
 /* vec3 abstractions */
-const v0 = [0, 0, 0]
-const vadd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-const vsub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-const vmul = (v, c) => [v[0] * c, v[1] * c, v[2] * c]
-const vdiv = (v, c) => [v[0] / c, v[1] / c, v[2] / c]
-const vabssq = v => v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
-const vabs = v => Math.sqrt(vabssq(v))
-const vneg = v => [-v[0], -v[1], -v[2]]
-const vnorm = v => vdiv(v, vabs(v))
-const vdot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
+const v0 = [0, 0, 0];
+const vadd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const vsub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const vmul = (v, c) => [v[0] * c, v[1] * c, v[2] * c];
+const vdiv = (v, c) => [v[0] / c, v[1] / c, v[2] / c];
+const vabssq = v => v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+const vabs = v => Math.sqrt(vabssq(v));
+const vneg = v => [-v[0], -v[1], -v[2]];
+const vnorm = v => vdiv(v, vabs(v));
+const vdot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
 const vcross = (u, v) => [
   u[1] * v[2] - u[2] * v[1],
   u[2] * v[0] - u[0] * v[2],
   u[0] * v[1] - u[1] * v[0],
-]
+];
 const vrand = (min, max) => [
   rand(min, max),
   rand(min, max),
   rand(min, max),
-]
+];
 const vrUnitSphere = () => {
   let p;
   for (let i = 0; i < 1000; i++) {
-    p = vrand(-1, 1)
+    p = vrand(-1, 1);
     if (vabssq(p) < 1) {
       return p;
     }
@@ -43,26 +43,31 @@ const vrUnitSphere = () => {
   return v0;
 }
 const vrUnitDisk = () => {
-  let p;
+  let a, b;
+  let p = [0, 0, 0];
   for (let i = 0; i < 1000; i++) {
-    p = [rand(-1, 1), rand(-1, 1), 0]
-    if (vabssq(p) < 1) {
+    a = Math.random() * 2 - 1;
+    b = Math.random() * 2 - 1;
+    if (a * a + b * b < 1) {
+      p[0] = a;
+      p[1] = b;
       return p;
     }
   }
   return v0;
 }
+const TAU = 2 * Math.PI;
 const vrUnitVec = () => {
-  const a = rand(0, 2 * Math.PI);
-  const z = rand(-1, 1)
+  const a = Math.random() * TAU;
+  const z = Math.random();
   const r = Math.sqrt(1 - z * z);
   return [
     r * Math.cos(a),
     r * Math.sin(a),
     z,
-  ]
+  ];
 }
-const reflect = (v, n) => vsub(v, vmul(n, 2 * vdot(v, n)))
+const reflect = (v, n) => vsub(v, vmul(n, 2 * vdot(v, n)));
 const refract = (uv, n, eta) => {
   const cosT = vdot(vneg(uv), n);
   const rOutPerp = vmul(vadd(uv, vmul(n, cosT)), eta);
@@ -187,8 +192,7 @@ const Dielectric = ri => {
       const eta = rec.frontFace ? 1 / ri : ri;
 
       const unitDir = vnorm(r.dir);
-      const cosThetaTmp = vdot(vneg(unitDir), rec.normal);
-      const cosTheta = cosThetaTmp > 1 ? 1 : cosThetaTmp;
+      const cosTheta = Math.min(1, vdot(vneg(unitDir), rec.normal));
       const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
 
       if (eta * sinTheta > 1) {
@@ -205,7 +209,7 @@ const Dielectric = ri => {
       }
       const refracted = refract(unitDir, rec.normal, eta);
       scattered.pos = rec.point;
-      scattered.dir = refracted
+      scattered.dir = refracted;
       return true;
     }
   }
@@ -284,14 +288,16 @@ const Sphere = (pos, radius, material) => {
   }
 }
 const Collection = shapes => {
+  const len = shapes.length;
   return {
     hit(r, tMin, tMax, rec) {
       let tmp = hit0;
       let hitAnything = false;
       let closestSoFar = tMax;
 
-      for (const shp of shapes) {
-        if (shp.hit(r, tMin, closestSoFar, tmp)) {
+      let i = len;
+      while (i-- > 0) {
+        if (shapes[i].hit(r, tMin, closestSoFar, tmp)) {
           closestSoFar = tmp.t;
           hitAnything = true;
         }
@@ -311,7 +317,6 @@ const Collection = shapes => {
 /* main render loop */
 const MAX_DEPTH = 50;
 const BLACK = [0, 0, 0];
-// TODO: right now only does single sample per px
 const render = (camera, shapes, width, height, bitmap) => {
   const color = (r, depth) => {
     if (!depth) return BLACK;
@@ -319,7 +324,6 @@ const render = (camera, shapes, width, height, bitmap) => {
     let rec = hit0;
     let attenuation = [1, 1, 1];
     let scattered = ray0;
-
     if (shapes.hit(r, 0.00001, 9999999, rec)) {
       if (rec.material.scatter(r, rec, attenuation, scattered)) {
         const c = color(scattered, depth - 1);
