@@ -71,7 +71,7 @@ const refract = (uv, n, eta) => {
 }
 
 /* ray abstractions */
-const ray = (pos, dir) => { pos, dir }
+const ray = (pos, dir) => ({ pos, dir });
 const ray0 = ray(v0, v0);
 const rat = (r, t) => vadd(r.pos, vmul(r.dir, t));
 
@@ -251,7 +251,7 @@ const Sphere = (pos, radius, material) => {
       const a = vabssq(r.dir);
       const halfB = vdot(oc, r.dir);
       const c = vabssq(oc) - radiussq;
-      const discriminant = halfB * half B - a * c;
+      const discriminant = halfB * halfB - a * c;
 
       if (discriminant < 0) {
         return false;
@@ -311,13 +311,14 @@ const Collection = shapes => {
 /* main render loop */
 const MAX_DEPTH = 50;
 const BLACK = [0, 0, 0];
-const render = (shapes, width, height) = {
+// TODO: right now only does single sample per px
+const render = (camera, shapes, width, height, bitmap) => {
   const color = (r, depth) => {
     if (!depth) return BLACK;
 
-    let rec = hit0.slice();
+    let rec = hit0;
     let attenuation = [1, 1, 1];
-    let scattered = ray0.slice();
+    let scattered = ray0;
     if (shapes.hit(r, 0.00001, 9999999, rec)) {
       if (rec.material.scatter(r, rec, attenuation, scattered)) {
         const c = color(scattered, depth - 1);
@@ -336,27 +337,72 @@ const render = (shapes, width, height) = {
     );
   }
 
-  for (let x = 0; x < width; x ++) {
-    for (let y = 0; y < height; y ++) {
-      // TODO
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      const c = color(
+        camera.getRay(
+          (x + Math.random()) / (width - 1),
+          (y + Math.random()) / (height - 1),
+        ),
+        MAX_DEPTH,
+      );
+
+      bitmap[y * width + x] = c.map(x => Math.sqrt(x) * 255);
     }
   }
 }
 
 class Render extends Component {
-  init(scene) {
-    this.scene = scene;
+  init(camera, shapes) {
+    this.camera = camera;
+    this.shapes = shapes;
     this.node = document.createElement('canvas');
     this.ctx = this.node.getContext('2d');
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.render();
+  }
+  px(x, y, color) {
+    this.ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+    this.ctx.fillRect(x, y, 1, 1);
   }
   render() {
-    // TODO: render
+    this.node.width = this.width;
+    this.node.height = this.height;
+
+    const BITMAP_SIZE = this.width * this.height;
+    const bitmap = new Array(BITMAP_SIZE);
+    const data = render(
+      this.camera,
+      this.shapes,
+      this.width,
+      this.height,
+      bitmap,
+    );
+    for (let i = 0; i < BITMAP_SIZE; i++) {
+      const x = i % this.width;
+      const y = ~~(i / this.width);
+      this.px(x, y, bitmap[i]);
+    }
   }
 }
 
 class App extends Component {
   init() {
-    this.r = new Render();
+    this.r = new Render(
+      Camera(
+        [-3, 3, 2],
+        [0, 0, -1],
+        [0, 1, 0],
+        30,
+        window.innerWidth / window.innerHeight,
+        0.75,
+      ),
+      Collection([
+        Sphere([0, 0, -1], 0.5, Lambertian([0.6, 0.5, 0.3])),
+        Sphere([0, -100.5, -1], 100, Lambertian([0.5, 0.5, 0.5])),
+      ]),
+    );
   }
   compose() {
     return jdom`<div class="app">
