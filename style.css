@@ -1,0 +1,15 @@
+html,
+body {
+  margin: 0;
+}
+
+h1 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  padding: .2em;
+}
+
+canvas {
+  margin: 0;
+}

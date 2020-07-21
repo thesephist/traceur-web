@@ -21,7 +21,7 @@ const vabssq = v => v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
 const vabs = v => Math.sqrt(vabssq(v))
 const vneg = v => [-v[0], -v[1], -v[2]]
 const vnorm = v => vdiv(v, vabs(v))
-const vdot = (u, v) => u[0] * v[0] + u[1] + v[1] + u[2] + v[2]
+const vdot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
 const vcross = (u, v) => [
   u[1] * v[2] - u[2] * v[1],
   u[2] * v[0] - u[0] * v[2],
@@ -56,7 +56,7 @@ const vrUnitVec = () => {
   const a = rand(0, 2 * Math.PI);
   const z = rand(-1, 1)
   const r = Math.sqrt(1 - z * z);
-  [
+  return [
     r * Math.cos(a),
     r * Math.sin(a),
     z,
@@ -65,7 +65,7 @@ const vrUnitVec = () => {
 const reflect = (v, n) => vsub(v, vmul(n, 2 * vdot(v, n)))
 const refract = (uv, n, eta) => {
   const cosT = vdot(vneg(uv), n);
-  const rOutPerp = vmul(vadd(uv, vmul(n, cosT)), eta)
+  const rOutPerp = vmul(vadd(uv, vmul(n, cosT)), eta);
   const rOutParallel = vmul(n, -Math.sqrt(Math.abs(1 - vabssq(rOutPerp))));
   return vadd(rOutPerp, rOutParallel);
 }
@@ -258,9 +258,8 @@ const Sphere = (pos, radius, material) => {
       }
 
       const root = Math.sqrt(discriminant);
-      const t1 = (-halfB + root) / a;
-      const t2 = (-halfB - root) / a;
 
+      const t2 = (-halfB - root) / a;
       if (t2 < tMax && t2 > tMin) {
         rec.t = t2;
         rec.point = rat(r, t2);
@@ -270,11 +269,12 @@ const Sphere = (pos, radius, material) => {
         return true;
       }
 
+      const t1 = (-halfB + root) / a;
       if (t1 < tMax && t1 > tMin) {
         rec.t = t1;
         rec.point = rat(r, t1);
         const outwardNormal = vdiv(vsub(rec.point, pos), radius);
-        rec.setFaceNormal(r.outwardNormal);
+        rec.setFaceNormal(r, outwardNormal);
         rec.material = material;
         return true;
       }
@@ -319,6 +319,7 @@ const render = (camera, shapes, width, height, bitmap) => {
     let rec = hit0;
     let attenuation = [1, 1, 1];
     let scattered = ray0;
+
     if (shapes.hit(r, 0.00001, 9999999, rec)) {
       if (rec.material.scatter(r, rec, attenuation, scattered)) {
         const c = color(scattered, depth - 1);
@@ -353,13 +354,13 @@ const render = (camera, shapes, width, height, bitmap) => {
 }
 
 class Render extends Component {
-  init(camera, shapes) {
+  init(width, height, camera, shapes) {
+    this.width = width;
+    this.height = height;
     this.camera = camera;
     this.shapes = shapes;
     this.node = document.createElement('canvas');
     this.ctx = this.node.getContext('2d');
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
     this.render();
   }
   px(x, y, color) {
@@ -367,21 +368,22 @@ class Render extends Component {
     this.ctx.fillRect(x, y, 1, 1);
   }
   render() {
-    this.node.width = this.width;
-    this.node.height = this.height;
+    const { width, height } = this;
+    this.node.width = width;
+    this.node.height = height;
 
-    const BITMAP_SIZE = this.width * this.height;
+    const BITMAP_SIZE = width * height;
     const bitmap = new Array(BITMAP_SIZE);
     const data = render(
       this.camera,
       this.shapes,
-      this.width,
-      this.height,
+      width,
+      height,
       bitmap,
     );
     for (let i = 0; i < BITMAP_SIZE; i++) {
-      const x = i % this.width;
-      const y = ~~(i / this.width);
+      const x = i % width;
+      const y = height - (i / width);
       this.px(x, y, bitmap[i]);
     }
   }
@@ -390,17 +392,22 @@ class Render extends Component {
 class App extends Component {
   init() {
     this.r = new Render(
+      window.innerWidth,
+      window.innerHeight,
       Camera(
         [-3, 3, 2],
         [0, 0, -1],
         [0, 1, 0],
         30,
         window.innerWidth / window.innerHeight,
-        0.75,
+        0.15,
       ),
       Collection([
-        Sphere([0, 0, -1], 0.5, Lambertian([0.6, 0.5, 0.3])),
-        Sphere([0, -100.5, -1], 100, Lambertian([0.5, 0.5, 0.5])),
+        Sphere([0, -100.5, -1], 100, Mirror([0.99, 0.99, 0.99])),
+        Sphere([0, 0, -1], 0.5, Lambertian([0.3, 0.5, 0.6])),
+        Sphere([-1, 0, -1], 0.5, Water),
+        Sphere([-1, 0, -1], 0.3, Glass),
+        Sphere([1, 0, -1], 0.5, Metal([0.8, 0.6, 0.2], 0.12)),
       ]),
     );
   }
