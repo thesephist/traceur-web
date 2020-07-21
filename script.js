@@ -348,10 +348,14 @@ const render = (camera, shapes, width, height, bitmap) => {
         MAX_DEPTH,
       );
 
-      bitmap[y * width + x] = c.map(x => Math.sqrt(x) * 255);
+      bitmap[y * width + x][0] += c[0];
+      bitmap[y * width + x][1] += c[1];
+      bitmap[y * width + x][2] += c[2];
     }
   }
 }
+
+const gammaCorrect = x => Math.sqrt(x) * 255;
 
 class Render extends Component {
   init(width, height, camera, shapes) {
@@ -361,61 +365,104 @@ class Render extends Component {
     this.shapes = shapes;
     this.node = document.createElement('canvas');
     this.ctx = this.node.getContext('2d');
-    this.render();
+
+    // start with black initially
+    this.node.width = width;
+    this.node.height = height;
+    this.ctx.fillStyle = '#dddddd';
+    this.ctx.fillRect(0, 0, width, height);
+
+    this.samples = 0;
+    this.BITMAP_SIZE = width * height;
+    this.colors = new Array(this.BITMAP_SIZE);
+    let i = this.BITMAP_SIZE;
+    while (i-- > 0) {
+      this.colors[i] = [0, 0, 0];
+    }
   }
   px(x, y, color) {
-    this.ctx.fillStyle = `rgb(${color[0]},${color[1]},${color[2]})`;
+    this.ctx.fillStyle = `rgb(${
+      gammaCorrect(color[0] / this.samples)
+      },${
+      gammaCorrect(color[1] / this.samples)
+      },${
+      gammaCorrect(color[2] / this.samples)})`;
     this.ctx.fillRect(x, y, 1, 1);
   }
   render() {
+    this.samples++;
+
     const { width, height } = this;
     this.node.width = width;
     this.node.height = height;
 
-    const BITMAP_SIZE = width * height;
-    const bitmap = new Array(BITMAP_SIZE);
     const data = render(
       this.camera,
       this.shapes,
       width,
       height,
-      bitmap,
+      this.colors,
     );
-    for (let i = 0; i < BITMAP_SIZE; i++) {
+    for (let i = 0; i < this.BITMAP_SIZE; i++) {
       const x = i % width;
       const y = height - (i / width);
-      this.px(x, y, bitmap[i]);
+      this.px(x, y, this.colors[i]);
     }
   }
 }
 
 class App extends Component {
   init() {
+    this.resetScene();
+  }
+  resetScene() {
+    const width = Math.min(720, window.innerWidth - 16);
+    const height = Math.min(480, window.innerHeight - 16);
     this.r = new Render(
-      window.innerWidth,
-      window.innerHeight,
+      width, height,
       Camera(
-        [-3, 3, 2],
-        [0, 0, -1],
+        [-7, 2, 2],
+        [0, 0, -1.8],
         [0, 1, 0],
-        30,
-        window.innerWidth / window.innerHeight,
-        0.15,
+        15,
+        width / height,
+        0.16,
       ),
       Collection([
-        Sphere([0, -100.5, -1], 100, Mirror([0.99, 0.99, 0.99])),
-        Sphere([0, 0, -1], 0.5, Lambertian([0.3, 0.5, 0.6])),
-        Sphere([-1, 0, -1], 0.5, Water),
-        Sphere([-1, 0, -1], 0.3, Glass),
-        Sphere([1, 0, -1], 0.5, Metal([0.8, 0.6, 0.2], 0.12)),
+        // backdrop
+        Sphere([0, -100.5, -1], 100, Metal([0.75, 0.75, 0.65], 0.2)),
+        Sphere([0, 0, -101.8], 100, Mirror([0.99, 0.99, 0.99])),
+        // objects
+        Sphere([-1, 0, -1], 0.5, Glass),
+        Sphere([-1, 0, -1], -0.36, Glass),
+        Sphere([0, -.14, -1], 0.36, Lambertian([0.067, 0.714, 0.65])),
+        Sphere([1, .14, -1], 0.64, Metal([0.9, 0.6, 0.5], 0.12)),
       ]),
     );
   }
   compose() {
     return jdom`<div class="app">
-      <h1>traceur web</h1>
       ${this.r.node}
-    </div>`;
+      <header>
+        <p>
+          <a href="https://github.com/thesephist/traceur-web" target="_blank">
+            <strong>traceur-web</strong>
+          </a>
+          is a JavaScript port of
+          <a href="https://github.com/thesephist/traceur" target="_blank">traceur</a>,
+          a path tracing renderer in
+          <a href="https://github.com/thesephist/ink" target="_blank">Ink</a> by
+          <a href="https://thesephist.com/" target="_blank">@thesephist</a>.
+        </p>
+      </header>
+      <nav>
+        <button class="movable colored paper"
+          onclick=${() => {
+        this.r.render();
+        this.render();
+      }}> Sample once more (${this.r.samples})</button >
+      </nav >
+    </div > `;
   }
 }
 

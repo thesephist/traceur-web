@@ -1,15 +1,56 @@
 html,
 body {
   margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background: #f8f8f8;
+  --paper-accent: #887ada;
 }
 
-h1 {
+.app {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+header,
+nav {
   position: fixed;
   top: 0;
-  left: 0;
-  padding: .2em;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  padding: 2em 0;
+}
+
+header p {
+  margin: 0;
+  line-height: 1.4em;
+}
+
+header p a {
+  color: var(--paper-accent);
+}
+
+nav {
+  bottom: 0;
+  top: unset;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+nav button {
+  font-size: 1em;
+  margin: 0 .4em;
 }
 
 canvas {
   margin: 0;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
