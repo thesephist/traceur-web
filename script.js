@@ -338,8 +338,9 @@ const render = (camera, shapes, width, height, bitmap) => {
     );
   }
 
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) {
+  let i = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++ , i += 3) {
       const c = color(
         camera.getRay(
           (x + Math.random()) / (width - 1),
@@ -348,9 +349,9 @@ const render = (camera, shapes, width, height, bitmap) => {
         MAX_DEPTH,
       );
 
-      bitmap[y * width + x][0] += c[0];
-      bitmap[y * width + x][1] += c[1];
-      bitmap[y * width + x][2] += c[2];
+      bitmap[i] += c[0];
+      bitmap[i + 1] += c[1];
+      bitmap[i + 2] += c[2];
     }
   }
 }
@@ -373,17 +374,13 @@ class Render extends Component {
     this.ctx.fillRect(0, 0, width, height);
 
     this.samples = 0;
-    this.BITMAP_SIZE = width * height;
-    this.colors = new Array(this.BITMAP_SIZE);
-    let i = this.BITMAP_SIZE;
-    while (i-- > 0) {
-      this.colors[i] = [0, 0, 0];
-    }
+    this.BITMAP_SIZE = 3 * width * height;
+    this.colors = new Float64Array(this.BITMAP_SIZE);
   }
   render() {
     this.samples++;
 
-    const { width, height } = this;
+    const { width, height, colors, BITMAP_SIZE } = this;
     this.node.width = width;
     this.node.height = height;
 
@@ -392,16 +389,15 @@ class Render extends Component {
       this.shapes,
       width,
       height,
-      this.colors,
+      colors,
     );
 
-    for (let i = 0; i < this.BITMAP_SIZE; i++) {
-      const color = this.colors[i];
+    for (let i = 0, p = 0; i < BITMAP_SIZE; i += 3, p++) {
       this.ctx.fillStyle = `rgb(${
-        gammaCorrect(color[0] / this.samples)
-        },${gammaCorrect(color[1] / this.samples)
-        },${gammaCorrect(color[2] / this.samples)})`;
-      this.ctx.fillRect(i % width, height + ~(i / width), 1, 1);
+        gammaCorrect(colors[i] / this.samples)
+        },${gammaCorrect(colors[i + 1] / this.samples)
+        },${gammaCorrect(colors[i + 2] / this.samples)})`;
+      this.ctx.fillRect(p % width, height + ~(p / width), 1, 1);
     }
   }
 }
