@@ -161,10 +161,59 @@ const Lambertian = color => {
 const Metal = (color, fuzz) => {
   return {
     scatter(r, rec, attenuation, scattered) {
-      // TODO
+      const reflected = reflect(vnorm(r.dir), rec.normal);
+
+      scattered.pos = rec.point
+      scattered.dir = fuzz === 0 ? reflected : vadd(reflected, vmul(vrUnitVec(), fuzz));
+
+      attenuation[0] = color[0];
+      attenuation[1] = color[1];
+      attenuation[2] = color[2];
+
+      return vdot(scattered.dir, rec.normal) > 0;
     }
   }
 }
+const Mirror = color => Metal(color, 0);
+const schlick = (cosine, ri) => {
+  let r0 = (1 - ri) / (1 + ri);
+  r0 = r0 * r0;
+  return r0 + (1 - r0) * Math.pow(1 - cosine, 5);
+}
+const Dielectric = ri => {
+  return {
+    scatter(r, rec, attenuation, scattered) {
+      attenuation[0] = attenuation[1] = attenuation[2] = 1;
+      const eta = rec.frontFace ? 1 / ri : ri;
+
+      const unitDir = vnorm(r.dir);
+      const cosThetaTmp = vdot(vneg(unitDir), rec.normal);
+      const cosTheta = cosThetaTmp > 1 ? 1 : cosThetaTmp;
+      const sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
+
+      if (eta * sinTheta > 1) {
+        const reflected = reflect(unitDir, rec.normal);
+        scattered.pos = rec.point;
+        scattered.dir = reflected;
+        return true;
+      }
+      if (schlick(cosTheta, eta) > Math.random()) {
+        const reflected = reflect(unitDir, rec.normal);
+        scattered.pos = rec.point;
+        scattered.dir = reflected;
+        return true;
+      }
+      const refracted = refract(unitDir, rec.normal, eta);
+      scattered.pos = rec.point;
+      scattered.dir = refracted
+      return true;
+    }
+  }
+}
+const Glass = Dielectric(1.517);
+const Water = Dielectric(1.333);
+const Diamond = Dielectric(2.417);
+const Material0 = Lambertian([0, 0, 0], 0.5);
 
 /* shape and hits abstractions */
 const hit = (
@@ -190,14 +239,105 @@ const hit = (
 const hit0 = hit(
   v0,
   v0,
-  material0,
+  Material0,
   0,
   false,
 );
 const Sphere = (pos, radius, material) => {
+  const radiussq = radius * radius;
   return {
     hit(r, tMin, tMax, rec) {
       const oc = vsub(r.pos, pos);
+      const a = vabssq(r.dir);
+      const halfB = vdot(oc, r.dir);
+      const c = vabssq(oc) - radiussq;
+      const discriminant = halfB * half B - a * c;
+
+      if (discriminant < 0) {
+        return false;
+      }
+
+      const root = Math.sqrt(discriminant);
+      const t1 = (-halfB + root) / a;
+      const t2 = (-halfB - root) / a;
+
+      if (t2 < tMax && t2 > tMin) {
+        rec.t = t2;
+        rec.point = rat(r, t2);
+        const outwardNormal = vdiv(vsub(rec.point, pos), radius);
+        rec.setFaceNormal(r, outwardNormal);
+        rec.material = material;
+        return true;
+      }
+
+      if (t1 < tMax && t1 > tMin) {
+        rec.t = t1;
+        rec.point = rat(r, t1);
+        const outwardNormal = vdiv(vsub(rec.point, pos), radius);
+        rec.setFaceNormal(r.outwardNormal);
+        rec.material = material;
+        return true;
+      }
+
+      return false;
+    }
+  }
+}
+const Collection = shapes => {
+  return {
+    hit(r, tMin, tMax, rec) {
+      let tmp = hit0;
+      let hitAnything = false;
+      let closestSoFar = tMax;
+
+      for (const shp of shapes) {
+        if (shp.hit(r, tMin, closestSoFar, tmp)) {
+          closestSoFar = tmp.t;
+          hitAnything = true;
+        }
+      }
+
+      rec.point = tmp.point;
+      rec.normal = tmp.normal;
+      rec.material = tmp.material;
+      rec.t = tmp.t;
+      rec.frontFace = tmp.frontFace;
+
+      return hitAnything;
+    }
+  }
+}
+
+/* main render loop */
+const MAX_DEPTH = 50;
+const BLACK = [0, 0, 0];
+const render = (shapes, width, height) = {
+  const color = (r, depth) => {
+    if (!depth) return BLACK;
+
+    let rec = hit0.slice();
+    let attenuation = [1, 1, 1];
+    let scattered = ray0.slice();
+    if (shapes.hit(r, 0.00001, 9999999, rec)) {
+      if (rec.material.scatter(r, rec, attenuation, scattered)) {
+        const c = color(scattered, depth - 1);
+        return [
+          attenuation[0] * c[0],
+          attenuation[1] * c[1],
+          attenuation[2] * c[2],
+        ];
+      }
+      return BLACK;
+    }
+    const t = 0.5 * (vnorm(r.dir)[1] + 1);
+    return vadd(
+      vmul([1, 1, 1], 1 - t),
+      [0.5 * t, 0.7 * t, t],
+    );
+  }
+
+  for (let x = 0; x < width; x ++) {
+    for (let y = 0; y < height; y ++) {
       // TODO
     }
   }
