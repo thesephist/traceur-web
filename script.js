@@ -364,7 +364,7 @@ class Render extends Component {
     this.camera = camera;
     this.shapes = shapes;
     this.node = document.createElement('canvas');
-    this.ctx = this.node.getContext('2d');
+    this.ctx = this.node.getContext('2d', { alpha: false });
 
     // start with black initially
     this.node.width = width;
@@ -380,15 +380,6 @@ class Render extends Component {
       this.colors[i] = [0, 0, 0];
     }
   }
-  px(x, y, color) {
-    this.ctx.fillStyle = `rgb(${
-      gammaCorrect(color[0] / this.samples)
-      },${
-      gammaCorrect(color[1] / this.samples)
-      },${
-      gammaCorrect(color[2] / this.samples)})`;
-    this.ctx.fillRect(x, y, 1, 1);
-  }
   render() {
     this.samples++;
 
@@ -396,17 +387,21 @@ class Render extends Component {
     this.node.width = width;
     this.node.height = height;
 
-    const data = render(
+    render(
       this.camera,
       this.shapes,
       width,
       height,
       this.colors,
     );
+
     for (let i = 0; i < this.BITMAP_SIZE; i++) {
-      const x = i % width;
-      const y = height - (i / width);
-      this.px(x, y, this.colors[i]);
+      const color = this.colors[i];
+      this.ctx.fillStyle = `rgb(${
+        gammaCorrect(color[0] / this.samples)
+        },${gammaCorrect(color[1] / this.samples)
+        },${gammaCorrect(color[2] / this.samples)})`;
+      this.ctx.fillRect(i % width, height + ~(i / width), 1, 1);
     }
   }
 }
