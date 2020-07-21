@@ -57,13 +57,17 @@ const vrUnitDisk = () => {
   return v0;
 }
 const TAU = 2 * Math.PI;
+const random = Math.random;
+const sqrt = Math.sqrt;
+const sin = Math.sin;
+const cos = Math.cos;
 const vrUnitVec = () => {
-  const a = Math.random() * TAU;
-  const z = Math.random();
-  const r = Math.sqrt(1 - z * z);
+  const a = random() * TAU;
+  const z = random();
+  const r = sqrt(1 - z * z);
   return [
-    r * Math.cos(a),
-    r * Math.sin(a),
+    r * cos(a),
+    r * sin(a),
     z,
   ];
 }
@@ -318,20 +322,19 @@ const Collection = shapes => {
 const MAX_DEPTH = 50;
 const BLACK = [0, 0, 0];
 const render = (camera, shapes, width, height, bitmap) => {
+  const rec = hit0;
+  const scattered = ray0;
   const color = (r, depth) => {
     if (!depth) return BLACK;
 
-    let rec = hit0;
-    let attenuation = [1, 1, 1];
-    let scattered = ray0;
+    const attenuation = [1, 1, 1];
     if (shapes.hit(r, 0.00001, 9999999, rec)) {
       if (rec.material.scatter(r, rec, attenuation, scattered)) {
         const c = color(scattered, depth - 1);
-        return [
-          attenuation[0] * c[0],
-          attenuation[1] * c[1],
-          attenuation[2] * c[2],
-        ];
+        attenuation[0] *= c[0];
+        attenuation[1] *= c[1];
+        attenuation[2] *= c[2];
+        return attenuation;
       }
       return BLACK;
     }
@@ -343,8 +346,10 @@ const render = (camera, shapes, width, height, bitmap) => {
   }
 
   let i = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++ , i += 3) {
+  // ImageData / our binary buffer format scans from
+  // bottom of the frame to the top.
+  for (let y = height - 1; y >= 0; y--) {
+    for (let x = 0; x < width; x++ , i += 4) {
       const c = color(
         camera.getRay(
           (x + Math.random()) / (width - 1),
@@ -378,13 +383,14 @@ class Render extends Component {
     this.ctx.fillRect(0, 0, width, height);
 
     this.samples = 0;
-    this.BITMAP_SIZE = 3 * width * height;
-    this.colors = new Float64Array(this.BITMAP_SIZE);
+    this.BITMAP_SIZE = 4 * width * height;
+    this.colors = new Float32Array(this.BITMAP_SIZE);
+    this.rgbs = new Uint8ClampedArray(this.BITMAP_SIZE);
   }
   render() {
     this.samples++;
 
-    const { width, height, colors, BITMAP_SIZE } = this;
+    const { width, height, colors, rgbs, BITMAP_SIZE } = this;
     this.node.width = width;
     this.node.height = height;
 
@@ -396,13 +402,16 @@ class Render extends Component {
       colors,
     );
 
-    for (let i = 0, p = 0; i < BITMAP_SIZE; i += 3, p++) {
-      this.ctx.fillStyle = `rgb(${
-        gammaCorrect(colors[i] / this.samples)
-        },${gammaCorrect(colors[i + 1] / this.samples)
-        },${gammaCorrect(colors[i + 2] / this.samples)})`;
-      this.ctx.fillRect(p % width, height + ~(p / width), 1, 1);
+    for (let i = 0; i < BITMAP_SIZE; i++) {
+      if (i % 4 === 3) {
+        rgbs[i] = 255;
+      } else {
+        rgbs[i] = ~~gammaCorrect(colors[i] / this.samples);
+      }
     }
+
+    const idata = new ImageData(rgbs, width, height);
+    this.ctx.putImageData(idata, 0, 0);
   }
 }
 
