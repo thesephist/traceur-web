@@ -221,6 +221,7 @@ const Dielectric = ri => {
 const Glass = Dielectric(1.517);
 const Water = Dielectric(1.333);
 const Diamond = Dielectric(2.417);
+const Light = luminosity => Metal([luminosity, luminosity, luminosity], 1);
 const Material0 = Lambertian([0, 0, 0], 0.5);
 
 /* shape and hits abstractions */
@@ -441,6 +442,8 @@ class App extends Component {
         Sphere([-1, 0, -1], -0.36, Glass),
         Sphere([0, -.14, -1], 0.36, Lambertian([0.067, 0.714, 0.65])),
         Sphere([1, .14, -1], 0.64, Metal([0.9, 0.6, 0.5], 0.12)),
+        // faux Light
+        Sphere([0, 1, -1.8], 0.4, Light(8)),
       ]),
     );
   }
